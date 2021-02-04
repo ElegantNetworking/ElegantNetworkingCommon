@@ -10,4 +10,8 @@ repositories {
 }
 
 dependencies {
+    compileOnly "io.netty:netty-all:4.1.25.Final"
+    compileOnly "org.apache.commons:commons-lang3:3.5"
+    compileOnly 'org.projectlombok:lombok:1.18.8'
+    annotationProcessor 'org.projectlombok:lombok:1.18.8'
 }
