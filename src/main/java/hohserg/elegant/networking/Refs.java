@@ -1,7 +1,5 @@
 package hohserg.elegant.networking;
 
-import hohserg.elegant.networking.api.ElegantPacket;
-
 public class Refs {
     public static final String serviceFolder = "META-INF/services/";
 
@@ -15,4 +13,9 @@ public class Refs {
     public static String getServicePath(String interfaceName) {
         return serviceFolder + interfaceName;
     }
+
+    public static final String basePath = "hohserg/elegant/networking/";
+    public static final String processorPath = basePath + "annotation/processor/";
+    public static final String apiPath = basePath + "api/";
+    public static final String testPath = basePath + "test/";
 }
