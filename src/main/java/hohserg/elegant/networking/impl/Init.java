@@ -57,7 +57,7 @@ public class Init {
             }
 
             for (int i = 0; i < packets.size(); i++) {
-                ElegantNetworking.register(new ElegantNetworking.PacketInfo(mod.getModid(), i + 1, packets.get(i).getCanonicalName()));
+                Registry.register(new Registry.PacketInfo(mod.getModid(), i + 1, packets.get(i).getCanonicalName()));
                 channelsToRegister.add(mod.getModid());
             }
         }
@@ -67,7 +67,7 @@ public class Init {
     private static void registerSerializer(Class<?> cl, Consumer<String> errorPrintln) {
         Class<? extends IByteBufSerializable> serializable = cl.getAnnotation(SerializerMark.class).packetClass();
         try {
-            ElegantNetworking.registerSerializer(serializable, (ISerializerBase) cl.newInstance());
+            Registry.registerSerializer(serializable, (ISerializerBase) cl.newInstance());
         } catch (InstantiationException | IllegalAccessException e) {
             errorPrintln.accept("Unable to create serializer for " + serializable);
             e.printStackTrace();

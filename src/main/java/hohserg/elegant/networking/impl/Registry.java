@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class ElegantNetworking {
+public class Registry {
     private static Map<String, String> channelByPacketClassName = new HashMap<>();
     private static Map<String, Integer> packetIdByPacketClassName = new HashMap<>();
     private static Map<Pair<String, Integer>, String> packetClassNameByChannelId = new HashMap<>();
@@ -31,7 +31,7 @@ public class ElegantNetworking {
         return packetClassNameByChannelId.get(Pair.of(channel, id));
     }
 
-    static <A extends IByteBufSerializable> ISerializerBase<A> getSerializer(String className) {
+    public static <A extends IByteBufSerializable> ISerializerBase<A> getSerializer(String className) {
         return serializerByPacketClassName.get(className);
     }
 
