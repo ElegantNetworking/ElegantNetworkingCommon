@@ -13,21 +13,6 @@ import static java.util.stream.Collectors.toList;
 
 public class ServiceUtils {
 
-    public static List<String> readService(InputStream inputStream) {
-        List<String> r = new ArrayList<>();
-        try (Scanner s = new Scanner(inputStream)/*.useDelimiter("\\A")*/) {
-            while (s.hasNextLine())
-                r.add(s.nextLine());
-
-            return r
-                    .stream()
-                    .map(ServiceUtils::removeComment)
-                    .map(String::trim)
-                    .filter(ServiceUtils::isClassName)
-                    .collect(toList());
-        }
-    }
-
     private static String removeComment(String line) {
         int commentStart = line.indexOf('#');
         if (commentStart >= 0)
@@ -45,7 +30,7 @@ public class ServiceUtils {
         if (entry != null) {
             try (InputStream inputStream = jar.getInputStream(entry)) {
                 return loadClassesFromService(inputStream);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
@@ -56,14 +41,29 @@ public class ServiceUtils {
         try (FileInputStream fileInputStream = new FileInputStream(new File(modLocation, path))) {
             return loadClassesFromService(fileInputStream);
         } catch (FileNotFoundException ignored) {
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return Stream.empty();
     }
 
+    public static List<String> loadClassNamesFromService(InputStream inputStream) {
+        List<String> r = new ArrayList<>();
+        try (Scanner s = new Scanner(inputStream)/*.useDelimiter("\\A")*/) {
+            while (s.hasNextLine())
+                r.add(s.nextLine());
+
+            return r
+                    .stream()
+                    .map(ServiceUtils::removeComment)
+                    .map(String::trim)
+                    .filter(ServiceUtils::isClassName)
+                    .collect(toList());
+        }
+    }
+
     public static Stream<? extends Class<?>> loadClassesFromService(InputStream inputStream) {
-        return readService(inputStream)
+        return loadClassNamesFromService(inputStream)
                 .stream()
                 .flatMap(className -> {
                     try {

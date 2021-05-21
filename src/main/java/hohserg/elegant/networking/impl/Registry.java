@@ -23,8 +23,12 @@ public class Registry {
         return channelByPacketClassName.entrySet().stream().filter(i -> i.getValue().equals(channel)).map(Map.Entry::getKey).collect(Collectors.toList());
     }
 
-    static int getPacketId(String className) {
-        return packetIdByPacketClassName.get(className);
+    static int getPacketId(String className) throws IllegalArgumentException {
+        Integer exists = packetIdByPacketClassName.get(className);
+        if (exists == null)
+            throw new IllegalArgumentException("Packet is not registered: " + className + ". Need to add @ElegantPacket annotation to packet class");
+        else
+            return exists;
     }
 
     static String getPacketName(String channel, int id) {
