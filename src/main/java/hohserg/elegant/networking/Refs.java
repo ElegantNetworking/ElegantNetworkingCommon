@@ -4,6 +4,7 @@ public class Refs {
     public static final String serviceFolder = "META-INF/services/";
 
     public static final String ElegantPacket_name = "hohserg.elegant.networking.api.ElegantPacket";
+    public static final String ElegantSerializable_name = "hohserg.elegant.networking.api.ElegantSerializable";
     public static final String ClientToServerPacket_name = "hohserg.elegant.networking.api.ClientToServerPacket";
     public static final String ServerToClientPacket_name = "hohserg.elegant.networking.api.ServerToClientPacket";
     public static final String IByteBufSerializable_name = "hohserg.elegant.networking.api.IByteBufSerializable";
