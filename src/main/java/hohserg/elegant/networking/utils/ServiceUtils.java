@@ -1,6 +1,9 @@
 package hohserg.elegant.networking.utils;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -8,7 +11,6 @@ import java.util.jar.JarFile;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 
-import static hohserg.elegant.networking.Refs.getServicePath;
 import static java.util.stream.Collectors.toList;
 
 public class ServiceUtils {
@@ -26,7 +28,7 @@ public class ServiceUtils {
     }
 
     public static Stream<? extends Class<?>> loadClassesFromJarService(JarFile jar, String path) {
-        ZipEntry entry = jar.getEntry(getServicePath(path));
+        ZipEntry entry = jar.getEntry(path);
         if (entry != null) {
             try (InputStream inputStream = jar.getInputStream(entry)) {
                 return loadClassesFromService(inputStream);
@@ -69,7 +71,7 @@ public class ServiceUtils {
                     try {
                         return Stream.of(Class.forName(className));
                     } catch (ClassNotFoundException e) {
-                        throw new RuntimeException("Class from service not found: " + className, e);
+                        return Stream.empty();
                     }
                 });
     }
