@@ -73,52 +73,56 @@ public class Init {
     }
 
     public static void registerAllPackets(List<ModInfo> mods, Consumer<String> msgPrintln, Consumer<String> errorPrintln, Consumer<String> channelNameConsumer) {
+        Set<String> excludedModid = new HashSet<>();
+        excludedModid.add("minecraft");
         PrintWriter errorWriter = PrintUtils.getWriterForStringConsumer(errorPrintln);
 
         Set<String> channelsToRegister = new HashSet<>();
         for (ModInfo mod : mods) {
-            try {
-                File source = mod.getSource();
+            if (!excludedModid.contains(mod.modid))
+                try {
+                    msgPrintln.accept("Started registration of elegant packets for modid " + mod.modid);
+                    File source = mod.getSource();
 
-                List<Class<?>> packets;
+                    List<Class<?>> packets;
 
-                Predicate<Class<?>> packetInterfaceFilter = cl -> Arrays.stream(cl.getInterfaces())
-                        .anyMatch(i -> i.getCanonicalName().equals(ClientToServerPacket_name) || i.getCanonicalName().equals(ServerToClientPacket_name));
+                    Predicate<Class<?>> packetInterfaceFilter = cl -> Arrays.stream(cl.getInterfaces())
+                            .anyMatch(i -> i.getCanonicalName().equals(ClientToServerPacket_name) || i.getCanonicalName().equals(ServerToClientPacket_name));
 
-                if (source.isDirectory()) {
-                    packets = Stream.concat(
-                            ServiceUtils.loadClassesFromFileService(source, getServicePath(ClientToServerPacket_name)),
-                            ServiceUtils.loadClassesFromFileService(source, getServicePath(ServerToClientPacket_name))
-                    ).filter(packetInterfaceFilter).collect(Collectors.toList());
-
-                    ServiceUtils.loadClassesFromFileService(source, getServicePath(ISerializer_name)).forEachOrdered(cl -> registerSerializer(cl, errorWriter));
-
-                } else {
-                    try (JarFile jar = new JarFile(source)) {
+                    if (source.isDirectory()) {
                         packets = Stream.concat(
-                                ServiceUtils.loadClassesFromJarService(jar, getServicePath(ClientToServerPacket_name)),
-                                ServiceUtils.loadClassesFromJarService(jar, getServicePath(ServerToClientPacket_name))
+                                ServiceUtils.loadClassesFromFileService(source, getServicePath(ClientToServerPacket_name)),
+                                ServiceUtils.loadClassesFromFileService(source, getServicePath(ServerToClientPacket_name))
                         ).filter(packetInterfaceFilter).collect(Collectors.toList());
 
+                        ServiceUtils.loadClassesFromFileService(source, getServicePath(ISerializer_name)).forEachOrdered(cl -> registerSerializer(cl, errorWriter));
 
-                        ServiceUtils.loadClassesFromJarService(jar, getServicePath(ISerializer_name)).forEachOrdered(cl -> registerSerializer(cl, errorWriter));
-                    } catch (IOException e) {
-                        e.printStackTrace(errorWriter);
-                        packets = new ArrayList<>();
+                    } else {
+                        try (JarFile jar = new JarFile(source)) {
+                            packets = Stream.concat(
+                                    ServiceUtils.loadClassesFromJarService(jar, getServicePath(ClientToServerPacket_name)),
+                                    ServiceUtils.loadClassesFromJarService(jar, getServicePath(ServerToClientPacket_name))
+                            ).filter(packetInterfaceFilter).collect(Collectors.toList());
+
+
+                            ServiceUtils.loadClassesFromJarService(jar, getServicePath(ISerializer_name)).forEachOrdered(cl -> registerSerializer(cl, errorWriter));
+                        } catch (IOException e) {
+                            e.printStackTrace(errorWriter);
+                            packets = new ArrayList<>();
+                        }
                     }
-                }
 
-                for (int i = 0; i < packets.size(); i++) {
-                    int id = i + 1;
-                    Registry.register(new Registry.PacketInfo(mod.getModid(), id, packets.get(i).getCanonicalName()));
-                    channelsToRegister.add(mod.getModid());
-                    msgPrintln.accept("Registered packet " + packets.get(i).getSimpleName() + " for channel " + mod.getModid() + " with id " + id);
+                    for (int i = 0; i < packets.size(); i++) {
+                        int id = i + 1;
+                        Registry.register(new Registry.PacketInfo(mod.getModid(), id, packets.get(i).getCanonicalName()));
+                        channelsToRegister.add(mod.getModid());
+                        msgPrintln.accept("Registered packet " + packets.get(i).getSimpleName() + " for channel " + mod.getModid() + " with id " + id);
+                    }
+                } catch (Throwable e) {
+                    errorWriter.println("Unable to register elegant packets for mod " + mod.getModid() + ". Caused by:");
+                    e.printStackTrace(errorWriter);
+                    errorWriter.println();
                 }
-            } catch (Throwable e) {
-                errorWriter.println("Unable to register elegant packets for mod " + mod.getModid() + ". Caused by:");
-                e.printStackTrace(errorWriter);
-                errorWriter.println();
-            }
         }
         channelsToRegister.forEach(channelNameConsumer);
     }
