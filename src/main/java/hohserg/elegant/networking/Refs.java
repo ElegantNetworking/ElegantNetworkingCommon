@@ -11,6 +11,18 @@ public class Refs {
     public static final String ISerializer_name = "hohserg.elegant.networking.impl.ISerializer";
     public static final String SerializerMark_name = "hohserg.elegant.networking.impl.SerializerMark";
 
+    public static final String relocatePrefix = "shadow.";
+
+    private static String getOriginalQualifierName(String shadowedName) {
+        return shadowedName.substring(relocatePrefix.length());
+    }
+
+    public static final String ImmutableList_name = getOriginalQualifierName("com.google.common.collect.ImmutableList");
+    public static final String ImmutableSet_name = getOriginalQualifierName("com.google.common.collect.ImmutableSet");
+    public static final String ImmutableMap_name = getOriginalQualifierName("com.google.common.collect.ImmutableMap");
+    public static final String Pair_name = getOriginalQualifierName("org.apache.commons.lang3.tuple.Pair");
+
+
     public static String getServicePath(String interfaceName) {
         return serviceFolder + interfaceName;
     }
