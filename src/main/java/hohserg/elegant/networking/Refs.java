@@ -13,8 +13,11 @@ public class Refs {
 
     public static final String relocatePrefix = "shadow.";
 
-    private static String getOriginalQualifierName(String shadowedName) {
-        return shadowedName.substring(relocatePrefix.length());
+    private static String getOriginalQualifierName(String maybeShadowedName) {
+        if (maybeShadowedName.startsWith(relocatePrefix))
+            return maybeShadowedName.substring(relocatePrefix.length());
+        else
+            return maybeShadowedName;
     }
 
     public static final String ImmutableList_name = getOriginalQualifierName("com.google.common.collect.ImmutableList");
