@@ -12,6 +12,7 @@ public class Refs {
     public static final String SerializerMark_name = "hohserg.elegant.networking.impl.SerializerMark";
 
     public static final String relocatePrefix = "shadow.";
+    public static String reportUrlPlea = "Please, report to https://github.com/ElegantNetworking/ElegantNetworkingAnnotationProcessor/issues";
 
     private static String getOriginalQualifierName(String maybeShadowedName) {
         if (maybeShadowedName.startsWith(relocatePrefix))
