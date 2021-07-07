@@ -1,5 +1,9 @@
 package hohserg.elegant.networking.impl;
 
 public class Config {
-    public int packetSizeLimit;
+    int packetSizeLimit;
+
+    public int getPacketSizeLimit() {
+        return packetSizeLimit;
+    }
 }
