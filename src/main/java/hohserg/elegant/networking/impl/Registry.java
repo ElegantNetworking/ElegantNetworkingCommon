@@ -47,13 +47,13 @@ public class Registry {
         serializerByPacketClassName.put(serializable.getCanonicalName(), serializer);
     }
 
-    static void register(PacketInfo p) {
-        ISerializerBase serializer = serializerByPacketClassName.get(p.className);
+    static void register(String channel, int packetId, String packetClassName) {
+        ISerializerBase serializer = serializerByPacketClassName.get(packetClassName);
         if (serializer == null)
-            throw new RuntimeException("Serializer for packet " + p.className + " not found");
-        channelByPacketClassName.put(p.className, p.channel);
-        packetIdByPacketClassName.put(p.className, p.id);
-        packetClassNameByChannelId.put(Pair.of(p.channel, p.id), p.className);
+            throw new RuntimeException("Serializer for packet " + packetClassName + " not found");
+        channelByPacketClassName.put(packetClassName, channel);
+        packetIdByPacketClassName.put(packetClassName, packetId);
+        packetClassNameByChannelId.put(Pair.of(channel, packetId), packetClassName);
     }
 
     @Value

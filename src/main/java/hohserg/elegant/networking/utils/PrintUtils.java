@@ -17,14 +17,14 @@ public class PrintUtils {
             @Override
             public void flush() {
                 if (!content.isEmpty()) {
-                    print.accept(content.replace('\r',' '));
+                    print.accept(content.replace('\r', ' '));
                     content = "";
                 }
             }
 
             @Override
             public void close() {
-                content = "";
+                flush();
             }
         });
     }

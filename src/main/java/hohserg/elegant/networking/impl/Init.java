@@ -1,19 +1,17 @@
 package hohserg.elegant.networking.impl;
 
+import hohserg.elegant.networking.api.ElegantPacket;
 import hohserg.elegant.networking.api.IByteBufSerializable;
 import hohserg.elegant.networking.utils.PrintUtils;
-import hohserg.elegant.networking.utils.ServiceUtils;
-import lombok.Value;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.io.*;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
-import java.util.jar.JarFile;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static hohserg.elegant.networking.Refs.*;
+import java.util.stream.StreamSupport;
 
 public class Init {
 
@@ -66,74 +64,111 @@ public class Init {
         }
     }
 
-    @Value
-    public static class ModInfo {
-        String modid;
-        File source;
+    public static void initPackets(Consumer<String> msgPrintln, Consumer<String> errorPrintln, Consumer<String> channelNameConsumer) {
+        new Init(msgPrintln, errorPrintln, channelNameConsumer).registerAllPackets();
     }
 
-    public static void registerAllPackets(List<ModInfo> mods, Consumer<String> msgPrintln, Consumer<String> errorPrintln, Consumer<String> channelNameConsumer) {
-        Set<String> excludedModid = new HashSet<>();
-        excludedModid.add("minecraft");
-        PrintWriter errorWriter = PrintUtils.getWriterForStringConsumer(errorPrintln);
+    private final Consumer<String> msgPrintln;
+    private final Consumer<String> errorPrintln;
+    private final Consumer<String> channelNameConsumer;
+    private final PrintWriter errorWriter;
 
-        Set<String> channelsToRegister = new HashSet<>();
-        for (ModInfo mod : mods) {
-            if (!excludedModid.contains(mod.modid))
-                try {
-                    msgPrintln.accept("Started registration of elegant packets for modid " + mod.modid);
-                    File source = mod.getSource();
+    private Init(Consumer<String> msgPrintln, Consumer<String> errorPrintln, Consumer<String> channelNameConsumer) {
+        this.msgPrintln = msgPrintln;
+        this.errorPrintln = errorPrintln;
+        this.channelNameConsumer = channelNameConsumer;
+        errorWriter = PrintUtils.getWriterForStringConsumer(errorPrintln);
+    }
 
-                    List<Class<?>> packets;
+    private void registerAllPackets() {
+        safeIterator(ServiceLoader.load(ISerializerBase.class).iterator(), "Trouble while indexing serializers")
+                .forEachRemaining(serializer -> Registry.registerSerializer(getPacketClass(serializer), serializer));
 
-                    Predicate<Class<?>> packetInterfaceFilter = cl -> Arrays.stream(cl.getInterfaces())
-                            .anyMatch(i -> i.getCanonicalName().equals(ClientToServerPacket_name) || i.getCanonicalName().equals(ServerToClientPacket_name));
+        Map<String, List<Class<? extends IByteBufSerializable>>> channelToPackets =
+                StreamSupport.stream(
+                        Spliterators.spliteratorUnknownSize(
+                                safeIterator(
+                                        ServiceLoader.load(IPacketProvider.class).iterator(),
+                                        "Trouble while indexing elegant packets:"
+                                ),
+                                Spliterator.ORDERED
+                        ),
+                        false
+                )
+                        .flatMap(safeMapper(
+                                packetProvider -> Pair.of(getPacketChannel(packetProvider), packetProvider.getPacketClass()),
+                                "Trouble while indexing elegant packets:"
+                        ))
+                        .collect(Collectors.groupingBy(Pair::getLeft, Collectors.mapping(Pair::getRight, Collectors.toList())));
 
-                    if (source.isDirectory()) {
-                        packets = Stream.concat(
-                                ServiceUtils.loadClassesFromFileService(source, getServicePath(ClientToServerPacket_name)),
-                                ServiceUtils.loadClassesFromFileService(source, getServicePath(ServerToClientPacket_name))
-                        ).filter(packetInterfaceFilter).collect(Collectors.toList());
-
-                        ServiceUtils.loadClassesFromFileService(source, getServicePath(ISerializer_name)).forEachOrdered(cl -> registerSerializer(cl, errorWriter));
-
-                    } else {
-                        try (JarFile jar = new JarFile(source)) {
-                            packets = Stream.concat(
-                                    ServiceUtils.loadClassesFromJarService(jar, getServicePath(ClientToServerPacket_name)),
-                                    ServiceUtils.loadClassesFromJarService(jar, getServicePath(ServerToClientPacket_name))
-                            ).filter(packetInterfaceFilter).collect(Collectors.toList());
-
-
-                            ServiceUtils.loadClassesFromJarService(jar, getServicePath(ISerializer_name)).forEachOrdered(cl -> registerSerializer(cl, errorWriter));
-                        } catch (IOException e) {
-                            e.printStackTrace(errorWriter);
-                            packets = new ArrayList<>();
-                        }
-                    }
-
-                    for (int i = 0; i < packets.size(); i++) {
-                        int id = i + 1;
-                        Registry.register(new Registry.PacketInfo(mod.getModid(), id, packets.get(i).getCanonicalName()));
-                        channelsToRegister.add(mod.getModid());
-                        msgPrintln.accept("Registered packet " + packets.get(i).getSimpleName() + " for channel " + mod.getModid() + " with id " + id);
-                    }
-                } catch (Throwable e) {
-                    errorWriter.println("Unable to register elegant packets for mod " + mod.getModid() + ". Caused by:");
-                    e.printStackTrace(errorWriter);
-                    errorWriter.println();
+        channelToPackets.forEach((channel, packets) -> {
+            printStarted(channel);
+            try {
+                for (int i = 0; i < packets.size(); i++) {
+                    Class<? extends IByteBufSerializable> packetClass = packets.get(i);
+                    int packetId = i + 1;
+                    Registry.register(channel, packetId, packetClass.getCanonicalName());
+                    printRegistered(channel, packetClass, packetId);
                 }
-        }
-        channelsToRegister.forEach(channelNameConsumer);
+                channelNameConsumer.accept(channel);
+                printSuccessfully(channel);
+            } catch (Throwable e) {
+                printFailed(channel, e);
+            }
+        });
     }
 
-    private static void registerSerializer(Class<?> cl, PrintWriter errorPrintln) {
-        Class<? extends IByteBufSerializable> serializable = cl.getAnnotation(SerializerMark.class).packetClass();
-        try {
-            Registry.registerSerializer(serializable, (ISerializerBase) cl.newInstance());
-        } catch (InstantiationException | IllegalAccessException e) {
-            errorPrintln.println("Unable to create serializer for " + serializable);
-            e.printStackTrace(errorPrintln);
+    private void printStarted(String channel) {
+        msgPrintln.accept("Starting registration of elegant packets for channel " + channel);
+    }
+
+    private void printRegistered(String channel, Class<? extends IByteBufSerializable> packetClass, int packetId) {
+        msgPrintln.accept("Registered packet " + packetClass.getSimpleName() + " for channel " + channel + " with id " + packetId);
+    }
+
+    private void printSuccessfully(String channel) {
+        msgPrintln.accept("Successfully registered packets for channel " + channel);
+    }
+
+    private void printFailed(String channel, Throwable e) {
+        printError(e, "Failed to register packets for channel " + channel + "\nCaused by:");
+    }
+
+    private <A> Iterator<A> safeIterator(Iterator<A> iterator, String errorPrefix) {
+        List<A> content = new LinkedList<>();
+        while (iterator.hasNext()) {
+            try {
+                content.add(iterator.next());
+            } catch (Throwable e) {
+                printError(e, errorPrefix);
+            }
         }
+        return content.iterator();
+    }
+
+    private <A, B> Function<A, Stream<B>> safeMapper(Function<A, B> f, String errorPrefix) {
+        return a -> {
+            try {
+                return Stream.of(f.apply(a));
+            } catch (Throwable e) {
+                printError(e, errorPrefix);
+                return Stream.empty();
+            }
+        };
+    }
+
+    private void printError(Throwable e, String errorPrefix) {
+        errorPrintln.accept(errorPrefix);
+        e.printStackTrace(errorWriter);
+        errorWriter.flush();
+    }
+
+    private static String getPacketChannel(IPacketProvider packetProvider) {
+        String annotatedChannel = Objects.requireNonNull(packetProvider.getPacketClass().getAnnotation(ElegantPacket.class)).channel();
+        return annotatedChannel.equals("$modid") ? packetProvider.modid() : annotatedChannel;
+    }
+
+    private static Class<? extends IByteBufSerializable> getPacketClass(ISerializerBase serializer) {
+        return serializer.getClass().getAnnotation(SerializerMark.class).packetClass();
     }
 }
