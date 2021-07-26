@@ -15,15 +15,15 @@ public class Registry {
     private static Map<Pair<String, Integer>, String> packetClassNameByChannelId = new HashMap<>();
     private static Map<String, ISerializerBase> serializerByPacketClassName = new HashMap<>();
 
-    static String getChannelForPacket(String className) {
+    public static String getChannelForPacket(String className) {
         return channelByPacketClassName.get(className);
     }
 
-    static List<String> getPacketsForChannel(String channel) {
+    public static List<String> getPacketsForChannel(String channel) {
         return channelByPacketClassName.entrySet().stream().filter(i -> i.getValue().equals(channel)).map(Map.Entry::getKey).collect(Collectors.toList());
     }
 
-    static int getPacketId(String className) throws IllegalArgumentException {
+    public static int getPacketId(String className) throws IllegalArgumentException {
         Integer exists = packetIdByPacketClassName.get(className);
         if (exists == null)
             throw new IllegalArgumentException("Packet is not registered: " + className + ". Need to add @ElegantPacket annotation to packet class");
@@ -31,7 +31,7 @@ public class Registry {
             return exists;
     }
 
-    static String getPacketName(String channel, int id) {
+    public static String getPacketName(String channel, int id) {
         return packetClassNameByChannelId.get(Pair.of(channel, id));
     }
 
