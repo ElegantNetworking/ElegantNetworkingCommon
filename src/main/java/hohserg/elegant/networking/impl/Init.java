@@ -31,6 +31,9 @@ public class Init {
         try (FileWriter fileWriter = new FileWriter(configFile)) {
             fileWriter.write("# How many bytes can contains received packet\n");
             fileWriter.write("packetSizeLimit = " + config.packetSizeLimit + "\n");
+            fileWriter.write("\n");
+            fileWriter.write("# What is a background packet system will be used. Setting it to `CCLImpl` may fix some troubles\n");
+            fileWriter.write("backgroundPacketSystem = " + config.backgroundPacketSystem + "\n");
             fileWriter.flush();
 
         } catch (IOException e) {
@@ -55,6 +58,8 @@ public class Init {
                         String value = split[1].trim();
                         if (fieldName.equals("packetSizeLimit"))
                             config.packetSizeLimit = Integer.parseInt(value);
+                        if (fieldName.equals("backgroundPacketSystem"))
+                            config.backgroundPacketSystem = Config.BackgroundPacketSystem.valueOf(value);
                     }
                 }
             }
