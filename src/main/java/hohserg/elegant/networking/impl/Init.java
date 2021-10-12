@@ -2,125 +2,119 @@ package hohserg.elegant.networking.impl;
 
 import hohserg.elegant.networking.api.ElegantPacket;
 import hohserg.elegant.networking.api.IByteBufSerializable;
-import hohserg.elegant.networking.utils.PrintUtils;
-import org.apache.commons.lang3.tuple.Pair;
 
-import java.io.*;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 public class Init {
 
-    public static Config initConfig(File configFolder) {
-        File configFile = new File(configFolder, "elegant_networking.cfg");
-        Config config = new Config();
-
-        if (configFile.exists())
-            loadConfig(configFile, config);
-        else
-            saveDefaultConfig(configFile, config);
-
-        return config;
-    }
-
-    private static void saveDefaultConfig(File configFile, Config config) {
-        try (FileWriter fileWriter = new FileWriter(configFile)) {
-            fileWriter.write("# How many bytes can contains received packet\n");
-            fileWriter.write("packetSizeLimit = " + config.packetSizeLimit + "\n");
-            fileWriter.write("\n");
-            fileWriter.write("# What is a background packet system will be used. Setting it to `CCLImpl` may fix some troubles\n");
-            fileWriter.write("backgroundPacketSystem = " + config.backgroundPacketSystem + "\n");
-            fileWriter.flush();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void loadConfig(File configFile, Config config) {
-        try (
-                FileInputStream fileInputStream = new FileInputStream(configFile);
-                Scanner s = new Scanner(fileInputStream)
-        ) {
-
-            while (s.hasNextLine()) {
-                String line = s.nextLine();
-                int commentStart = line.indexOf('#');
-                String withoutComment = line.substring(0, commentStart == -1 ? line.length() : commentStart);
-                if (!withoutComment.isEmpty()) {
-                    String[] split = withoutComment.split("=");
-                    if (split.length == 2) {
-                        String fieldName = split[0].trim();
-                        String value = split[1].trim();
-                        if (fieldName.equals("packetSizeLimit"))
-                            config.packetSizeLimit = Integer.parseInt(value);
-                        if (fieldName.equals("backgroundPacketSystem"))
-                            config.backgroundPacketSystem = Config.BackgroundPacketSystem.valueOf(value);
-                    }
-                }
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void initPackets(Consumer<String> msgPrintln, Consumer<String> errorPrintln, Consumer<String> channelNameConsumer) {
-        new Init(msgPrintln, errorPrintln, channelNameConsumer).registerAllPackets();
+    public static void initPackets(Consumer<String> msgPrintln, Consumer<String> channelNameConsumer) {
+        Init instance = new Init(msgPrintln, channelNameConsumer);
+        instance.registerAllSerializers();
+        instance.registerAllPackets();
     }
 
     private final Consumer<String> msgPrintln;
-    private final Consumer<String> errorPrintln;
     private final Consumer<String> channelNameConsumer;
-    private final PrintWriter errorWriter;
 
-    private Init(Consumer<String> msgPrintln, Consumer<String> errorPrintln, Consumer<String> channelNameConsumer) {
+    private Init(Consumer<String> msgPrintln, Consumer<String> channelNameConsumer) {
         this.msgPrintln = msgPrintln;
-        this.errorPrintln = errorPrintln;
         this.channelNameConsumer = channelNameConsumer;
-        errorWriter = PrintUtils.getWriterForStringConsumer(errorPrintln);
     }
 
-    private void registerAllPackets() {
-        safeIterator(ServiceLoader.load(ISerializerBase.class).iterator(), "Trouble while indexing serializers")
-                .forEachRemaining(serializer -> Registry.registerSerializer(getPacketClass(serializer), serializer));
+    private static void handleErrors(String msg, Consumer<List<Throwable>> f) {
+        List<Throwable> errors = new ArrayList<>();
 
-        Map<String, List<Class<? extends IByteBufSerializable>>> channelToPackets =
-                StreamSupport.stream(
-                        Spliterators.spliteratorUnknownSize(
-                                safeIterator(
-                                        ServiceLoader.load(IPacketProvider.class).iterator(),
-                                        "Trouble while indexing elegant packets:"
-                                ),
-                                Spliterator.ORDERED
-                        ),
-                        false
-                )
-                        .flatMap(safeMapper(
-                                packetProvider -> Pair.of(getPacketChannel(packetProvider), packetProvider.getPacketClass()),
-                                "Trouble while indexing elegant packets:"
-                        ))
-                        .collect(Collectors.groupingBy(Pair::getLeft, Collectors.mapping(Pair::getRight, Collectors.toList())));
+        f.accept(errors);
+
+        if (errors.size() > 0)
+            throw new MultipleRuntimeException(msg, errors);
+    }
+
+    @SuppressWarnings("WhileLoopReplaceableByForEach")
+    private void registerAllSerializers() {
+        handleErrors("Trouble while indexing serializers", errors -> {
+            Iterator<ISerializerBase> iterator = ServiceLoader.load(ISerializerBase.class).iterator();
+            while (iterator.hasNext()) {
+                try {
+                    ISerializerBase serializer = iterator.next();
+                    Registry.registerSerializer(getPacketClass(serializer), serializer);
+                } catch (Throwable e) {
+                    errors.add(e);
+                }
+            }
+        });
+    }
+
+    @SuppressWarnings("WhileLoopReplaceableByForEach")
+    private void registerAllPackets() {
+
+        Map<String, List<Class<? extends IByteBufSerializable>>> channelToPackets = new HashMap<>();
+
+        handleErrors("Trouble while indexing elegant packets", errors -> {
+            Iterator<IPacketProvider> iterator = ServiceLoader.load(IPacketProvider.class).iterator();
+            while (iterator.hasNext()) {
+                try {
+                    IPacketProvider packetProvider = iterator.next();
+
+                    Class<? extends IByteBufSerializable> packetClass = packetProvider.getPacketClass();
+
+                    if (packetClass == null)
+                        throw new InvalidPacketProviderException(packetProvider, "getPacketClass return null");
+
+                    if (!IByteBufSerializable.class.isAssignableFrom(packetClass))
+                        throw new InvalidPacketProviderException(packetProvider, packetClass.getName() + " is not implementation of IByteBufSerializable");
+
+                    channelToPackets.computeIfAbsent(getPacketChannel(packetProvider), __ -> new ArrayList<>(3)).add(packetClass);
+
+                } catch (Throwable e) {
+                    errors.add(e);
+                }
+            }
+        });
+
 
         channelToPackets.forEach((channel, packets) -> {
             printStarted(channel);
-            try {
-                for (int i = 0; i < packets.size(); i++) {
-                    Class<? extends IByteBufSerializable> packetClass = packets.get(i);
-                    int packetId = i + 1;
-                    Registry.register(channel, packetId, packetClass.getCanonicalName());
-                    printRegistered(channel, packetClass, packetId);
+
+            handleErrors("Failed to register packets for channel " + channel, errors -> {
+                try {
+                    for (int i = 0; i < packets.size(); i++) {
+                        Class<? extends IByteBufSerializable> packetClass = packets.get(i);
+                        int packetId = i + 1;
+                        Registry.register(channel, packetId, packetClass.getCanonicalName());
+                        printRegistered(channel, packetClass, packetId);
+                    }
+                    channelNameConsumer.accept(channel);
+                    printSuccessfully(channel);
+                } catch (Throwable e) {
+                    errors.add(e);
                 }
-                channelNameConsumer.accept(channel);
-                printSuccessfully(channel);
-            } catch (Throwable e) {
-                printFailed(channel, e);
-            }
+            });
         });
+
+    }
+
+    public static void main(String[] a) {
+
+        /*
+        Collector<Pair<String, String>, ?, List<String>> toMapped =
+                Collectors.mapping(Pair::getRight, Collectors.toList());
+
+        Collector<Pair<String, String>, ?, HashMap<String, List<String>>> packetGrouping =
+                Collectors.groupingBy(Pair::getLeft, HashMap::new, toMapped);
+
+
+        Random random = new Random();
+        List<Pair<String,String>> packets = Stream.generate(() -> random.nextInt(1000)).limit(300).distinct().map(i->"packet_"+i).map(p -> Pair.of("channnel_" + random.nextInt(3), p)).collect(Collectors.toList());
+
+        Set<HashMap<String, List<String>>> variants = new HashSet<>();
+
+        for (int i = 0; i < 10000; i++)
+            variants.add(packets.stream().collect(packetGrouping));
+
+        System.out.println(variants.size());*/
+
     }
 
     private void printStarted(String channel) {
@@ -135,45 +129,12 @@ public class Init {
         msgPrintln.accept("Successfully registered packets for channel " + channel);
     }
 
-    private void printFailed(String channel, Throwable e) {
-        printError(e, "Failed to register packets for channel " + channel + "\nCaused by:");
-    }
-
-    private <A> Iterator<A> safeIterator(Iterator<A> iterator, String errorPrefix) {
-        List<A> content = new LinkedList<>();
-        while (iterator.hasNext()) {
-            try {
-                content.add(iterator.next());
-            } catch (Throwable e) {
-                printError(e, errorPrefix);
-            }
-        }
-        return content.iterator();
-    }
-
-    private <A, B> Function<A, Stream<B>> safeMapper(Function<A, B> f, String errorPrefix) {
-        return a -> {
-            try {
-                return Stream.of(f.apply(a));
-            } catch (Throwable e) {
-                printError(e, errorPrefix);
-                return Stream.empty();
-            }
-        };
-    }
-
-    private void printError(Throwable e, String errorPrefix) {
-        errorPrintln.accept(errorPrefix);
-        e.printStackTrace(errorWriter);
-        errorWriter.flush();
-    }
-
     private static String getPacketChannel(IPacketProvider packetProvider) {
-        String annotatedChannel = Objects.requireNonNull(packetProvider.getPacketClass().getAnnotation(ElegantPacket.class)).channel();
+        String annotatedChannel = Objects.requireNonNull(packetProvider.getPacketClass().getAnnotation(ElegantPacket.class), "Missed annotation @ElegantPacket at " + packetProvider.getPacketClass().getName()).channel();
         return annotatedChannel.equals("$modid") ? packetProvider.modid() : annotatedChannel;
     }
 
     private static Class<? extends IByteBufSerializable> getPacketClass(ISerializerBase serializer) {
-        return serializer.getClass().getAnnotation(SerializerMark.class).packetClass();
+        return Objects.requireNonNull(serializer.getClass().getAnnotation(SerializerMark.class), "Missed annotation @SerializerMark at serializer " + serializer).packetClass();
     }
 }
