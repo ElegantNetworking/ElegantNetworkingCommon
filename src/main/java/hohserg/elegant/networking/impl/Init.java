@@ -82,7 +82,7 @@ public class Init {
                     for (int i = 0; i < packets.size(); i++) {
                         Class<? extends IByteBufSerializable> packetClass = packets.get(i);
                         int packetId = i + 1;
-                        Registry.register(channel, packetId, packetClass.getCanonicalName());
+                        Registry.register(channel, packetId, packetClass);
                         printRegistered(channel, packetClass, packetId);
                     }
                     channelNameConsumer.accept(channel);
@@ -99,24 +99,6 @@ public class Init {
 
         /*
         Collector<Pair<String, String>, ?, List<String>> toMapped =
-                Collectors.mapping(Pair::getRight, Collectors.toList());
-
-        Collector<Pair<String, String>, ?, HashMap<String, List<String>>> packetGrouping =
-                Collectors.groupingBy(Pair::getLeft, HashMap::new, toMapped);
-
-
-        Random random = new Random();
-        List<Pair<String,String>> packets = Stream.generate(() -> random.nextInt(1000)).limit(300).distinct().map(i->"packet_"+i).map(p -> Pair.of("channnel_" + random.nextInt(3), p)).collect(Collectors.toList());
-
-        Set<HashMap<String, List<String>>> variants = new HashSet<>();
-
-        for (int i = 0; i < 10000; i++)
-            variants.add(packets.stream().collect(packetGrouping));
-
-        System.out.println(variants.size());*/
-
-    }
-
     private void printStarted(String channel) {
         msgPrintln.accept("Starting registration of elegant packets for channel " + channel);
     }

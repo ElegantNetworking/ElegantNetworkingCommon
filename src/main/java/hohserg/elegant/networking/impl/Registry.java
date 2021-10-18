@@ -26,7 +26,7 @@ public class Registry {
     public static int getPacketId(String className) throws IllegalArgumentException {
         Integer exists = packetIdByPacketClassName.get(className);
         if (exists == null)
-            throw new IllegalArgumentException("Packet is not registered: " + className + ". Need to add @ElegantPacket annotation to packet class");
+            throw new IllegalArgumentException("Packet is not registered: " + className + ". Need to add @ElegantPacket annotation to packet class or check annotation processor availability");
         else
             return exists;
     }
@@ -40,14 +40,16 @@ public class Registry {
     }
 
     public static <A extends IByteBufSerializable> ISerializerBase<A> getSerializerFor(Class<A> serializable) {
-        return getSerializer(serializable.getCanonicalName());
+        return getSerializer(serializable.getName());
     }
 
     static void registerSerializer(Class<? extends IByteBufSerializable> serializable, ISerializerBase serializer) {
-        serializerByPacketClassName.put(serializable.getCanonicalName(), serializer);
+        serializerByPacketClassName.put(serializable.getName(), serializer);
     }
 
-    static void register(String channel, int packetId, String packetClassName) {
+    static void register(String channel, int packetId, Class<? extends IByteBufSerializable> packetClass) {
+        String packetClassName = packetClass.getName();
+
         ISerializerBase serializer = serializerByPacketClassName.get(packetClassName);
         if (serializer == null)
             throw new RuntimeException("Serializer for packet " + packetClassName + " not found");
