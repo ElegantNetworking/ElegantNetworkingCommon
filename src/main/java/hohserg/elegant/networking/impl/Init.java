@@ -95,10 +95,6 @@ public class Init {
 
     }
 
-    public static void main(String[] a) {
-
-        /*
-        Collector<Pair<String, String>, ?, List<String>> toMapped =
     private void printStarted(String channel) {
         msgPrintln.accept("Starting registration of elegant packets for channel " + channel);
     }
