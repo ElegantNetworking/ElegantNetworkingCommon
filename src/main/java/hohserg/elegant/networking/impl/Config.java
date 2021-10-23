@@ -29,18 +29,19 @@ public class Config {
 
         if (configFile.exists())
             loadConfig(configFile, config);
-        else
-            saveDefaultConfig(configFile, config);
+        saveConfig(configFile, config);
 
         return config;
     }
 
-    private static void saveDefaultConfig(File configFile, Config config) {
+    private static void saveConfig(File configFile, Config config) {
         try (FileWriter fileWriter = new FileWriter(configFile)) {
             fileWriter.write("# How many bytes can contains received packet. WIP feature!\n");
             fileWriter.write("packetSizeLimit = " + config.packetSizeLimit + "\n");
             fileWriter.write("\n");
-            fileWriter.write("# What is a background packet system will be used. Setting it to `CCLImpl` may fix some troubles\n");
+            fileWriter.write("# What is a background packet system will be used\n");
+            fileWriter.write("# Possible values: CCLImpl, ForgeImpl\n");
+            fileWriter.write("# Setting it to `CCLImpl` may fix some troubles\n");
             fileWriter.write("backgroundPacketSystem = " + config.backgroundPacketSystem + "\n");
             fileWriter.flush();
 
