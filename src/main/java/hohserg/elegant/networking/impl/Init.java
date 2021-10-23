@@ -6,9 +6,12 @@ import hohserg.elegant.networking.api.IByteBufSerializable;
 import java.util.*;
 import java.util.function.Consumer;
 
+import static hohserg.elegant.networking.utils.ChannelValidator.validateChannel;
+
 public class Init {
 
-    public static void initPackets(Consumer<String> msgPrintln, Consumer<String> warnPrintln, Consumer<String> channelNameConsumer) {
+    public static void initPackets(Consumer<String> msgPrintln, Consumer<String> warnPrintln, Consumer<String> channelNameConsumer, Config config) {
+        msgPrintln.accept("Used " + config.getBackgroundPacketSystem().name() + " as background packet system");
         Init instance = new Init(msgPrintln, warnPrintln, channelNameConsumer);
         instance.registerAllSerializers();
         instance.registerAllPackets();
@@ -41,6 +44,9 @@ public class Init {
                 try {
                     ISerializerBase serializer = iterator.next();
                     Registry.registerSerializer(getPacketClass(serializer), serializer);
+                } catch (TypeNotPresentException e) {
+                    warnPrintln.accept("Broken serializer. It's normal in dev environment. Caused by: " + e.toString());
+
                 } catch (Throwable e) {
                     errors.add(e);
                 }
@@ -62,12 +68,15 @@ public class Init {
                     Class<? extends IByteBufSerializable> packetClass = packetProvider.getPacketClass();
 
                     if (packetClass == null)
-                        throw new InvalidPacketProviderException(packetProvider, "getPacketClass return null");
+                        throw new InvalidPacketProviderException(packetProvider, "Provided class is null");
 
                     if (!IByteBufSerializable.class.isAssignableFrom(packetClass))
-                        throw new InvalidPacketProviderException(packetProvider, packetClass.getName() + " is not implementation of IByteBufSerializable");
+                        throw new InvalidPacketProviderException(packetProvider, "Provided class is not implementation of IByteBufSerializable");
 
                     channelToPackets.computeIfAbsent(getPacketChannel(packetProvider), __ -> new ArrayList<>(3)).add(packetClass);
+
+                } catch (TypeNotPresentException | NoClassDefFoundError | InvalidPacketProviderException e) {
+                    warnPrintln.accept("Broken packet provider. It's normal in dev environment. Caused by: " + e.toString());
 
                 } catch (Throwable e) {
                     errors.add(e);
@@ -77,9 +86,7 @@ public class Init {
 
 
         channelToPackets.forEach((channel, packets) -> {
-            String actualChannel = channel.substring(0, Math.min(channel.length(), 20));
-            if (channel.length() > 20)
-                warnPrintln.accept("Channel name must be no longer that 20. Found: " + channel + ". Used: " + actualChannel);
+            String actualChannel = validateChannel(channel, warnPrintln);
             printStarted(actualChannel);
 
             handleErrors("Failed to register packets for channel " + actualChannel, errors -> {
@@ -113,7 +120,10 @@ public class Init {
     }
 
     private static String getPacketChannel(IPacketProvider packetProvider) {
-        String annotatedChannel = Objects.requireNonNull(packetProvider.getPacketClass().getAnnotation(ElegantPacket.class), "Missed annotation @ElegantPacket at " + packetProvider.getPacketClass().getName()).channel();
+        ElegantPacket annotation = packetProvider.getPacketClass().getAnnotation(ElegantPacket.class);
+        if (annotation == null)
+            throw new InvalidPacketProviderException(packetProvider, "Provided class is not marked by @ElegantPacket");
+        String annotatedChannel = annotation.channel();
         return annotatedChannel.equals("$modid") ? packetProvider.modid() : annotatedChannel;
     }
 
