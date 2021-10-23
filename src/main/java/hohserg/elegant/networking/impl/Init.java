@@ -8,17 +8,19 @@ import java.util.function.Consumer;
 
 public class Init {
 
-    public static void initPackets(Consumer<String> msgPrintln, Consumer<String> channelNameConsumer) {
-        Init instance = new Init(msgPrintln, channelNameConsumer);
+    public static void initPackets(Consumer<String> msgPrintln, Consumer<String> warnPrintln, Consumer<String> channelNameConsumer) {
+        Init instance = new Init(msgPrintln, warnPrintln, channelNameConsumer);
         instance.registerAllSerializers();
         instance.registerAllPackets();
     }
 
     private final Consumer<String> msgPrintln;
+    private final Consumer<String> warnPrintln;
     private final Consumer<String> channelNameConsumer;
 
-    private Init(Consumer<String> msgPrintln, Consumer<String> channelNameConsumer) {
+    private Init(Consumer<String> msgPrintln, Consumer<String> warnPrintln, Consumer<String> channelNameConsumer) {
         this.msgPrintln = msgPrintln;
+        this.warnPrintln = warnPrintln;
         this.channelNameConsumer = channelNameConsumer;
     }
 
@@ -75,18 +77,21 @@ public class Init {
 
 
         channelToPackets.forEach((channel, packets) -> {
-            printStarted(channel);
+            String actualChannel = channel.substring(0, 20);
+            if (channel.length() > 20)
+                warnPrintln.accept("Channel name must be no longer that 20. Found: " + channel + ". Used: " + actualChannel);
+            printStarted(actualChannel);
 
-            handleErrors("Failed to register packets for channel " + channel, errors -> {
+            handleErrors("Failed to register packets for channel " + actualChannel, errors -> {
                 try {
                     for (int i = 0; i < packets.size(); i++) {
                         Class<? extends IByteBufSerializable> packetClass = packets.get(i);
                         int packetId = i + 1;
-                        Registry.register(channel, packetId, packetClass);
-                        printRegistered(channel, packetClass, packetId);
+                        Registry.register(actualChannel, packetId, packetClass);
+                        printRegistered(actualChannel, packetClass, packetId);
                     }
-                    channelNameConsumer.accept(channel);
-                    printSuccessfully(channel);
+                    channelNameConsumer.accept(actualChannel);
+                    printSuccessfully(actualChannel);
                 } catch (Throwable e) {
                     errors.add(e);
                 }
