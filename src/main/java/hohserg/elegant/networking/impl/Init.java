@@ -77,7 +77,7 @@ public class Init {
 
 
         channelToPackets.forEach((channel, packets) -> {
-            String actualChannel = channel.substring(0, 20);
+            String actualChannel = channel.substring(0, Math.min(channel.length(), 20));
             if (channel.length() > 20)
                 warnPrintln.accept("Channel name must be no longer that 20. Found: " + channel + ". Used: " + actualChannel);
             printStarted(actualChannel);
