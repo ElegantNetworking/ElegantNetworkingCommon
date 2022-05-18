@@ -124,7 +124,11 @@ public class Init {
         if (annotation == null)
             throw new InvalidPacketProviderException(packetProvider, "Provided class is not marked by @ElegantPacket");
         String annotatedChannel = annotation.channel();
-        return annotatedChannel.equals("$modid") ? packetProvider.modid() : annotatedChannel;
+        return trimChannel(annotatedChannel.equals("$modid") ? packetProvider.modid() : annotatedChannel);
+    }
+
+    private static String trimChannel(String channel) {
+        return channel.substring(0, Math.min(channel.length(), 20));
     }
 
     private static Class<? extends IByteBufSerializable> getPacketClass(ISerializerBase serializer) {
