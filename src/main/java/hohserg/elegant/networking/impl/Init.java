@@ -119,19 +119,23 @@ public class Init {
         msgPrintln.accept("Successfully registered packets for channel " + channel);
     }
 
-    private static String getPacketChannel(IPacketProvider packetProvider) {
+    private String getPacketChannel(IPacketProvider packetProvider) {
         ElegantPacket annotation = packetProvider.getPacketClass().getAnnotation(ElegantPacket.class);
         if (annotation == null)
-            throw new InvalidPacketProviderException(packetProvider, "Provided class is not marked by @ElegantPacket");
+            throw new InvalidPacketProviderException(packetProvider, "Provided packet class is not marked by @ElegantPacket");
         String annotatedChannel = annotation.channel();
-        return trimChannel(annotatedChannel.equals("$modid") ? packetProvider.modid() : annotatedChannel);
+        return trimChannel(annotatedChannel.equals("$modid") ? packetProvider.modid() : annotatedChannel, packetProvider.getPacketClass().getSimpleName());
     }
 
-    private static String trimChannel(String channel) {
-        return channel.substring(0, Math.min(channel.length(), 20));
+    private String trimChannel(String channel, String packetSimpleName) {
+        if (channel.length() > 20) {
+            warnPrintln.accept("Channel '" + channel + "' of packet '" + packetSimpleName + "' is longer that 20. Trimming");
+            return channel.substring(0, 20);
+        } else
+            return channel;
     }
 
-    private static Class<? extends IByteBufSerializable> getPacketClass(ISerializerBase serializer) {
+    private Class<? extends IByteBufSerializable> getPacketClass(ISerializerBase serializer) {
         return Objects.requireNonNull(serializer.getClass().getAnnotation(SerializerMark.class), "Missed annotation @SerializerMark at serializer " + serializer).packetClass();
     }
 }
