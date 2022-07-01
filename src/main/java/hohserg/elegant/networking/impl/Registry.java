@@ -1,5 +1,6 @@
 package hohserg.elegant.networking.impl;
 
+import hohserg.elegant.networking.api.ElegantPacket;
 import hohserg.elegant.networking.api.IByteBufSerializable;
 import lombok.Value;
 import org.apache.commons.lang3.tuple.Pair;
@@ -23,10 +24,14 @@ public class Registry {
         return channelByPacketClassName.entrySet().stream().filter(i -> i.getValue().equals(channel)).map(Map.Entry::getKey).collect(Collectors.toList());
     }
 
-    public static int getPacketId(String className) throws IllegalArgumentException {
+    public static int getPacketId(Class<? extends IByteBufSerializable> cl) throws IllegalArgumentException {
+        String className = cl.getName();
         Integer exists = packetIdByPacketClassName.get(className);
         if (exists == null)
-            throw new IllegalArgumentException("Packet is not registered: " + className + ". Need to add @ElegantPacket annotation to packet class or check annotation processor availability");
+            throw new IllegalArgumentException("Packet is not registered: " + className + ". " +
+                    (cl.getAnnotation(ElegantPacket.class) == null ?
+                            "Need to add @ElegantPacket annotation to packet class" :
+                            "Check annotation processor availability"));
         else
             return exists;
     }
