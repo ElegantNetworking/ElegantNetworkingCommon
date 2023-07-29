@@ -10,8 +10,7 @@ import static hohserg.elegant.networking.utils.ChannelValidator.validateChannel;
 
 public class Init {
 
-    public static void initPackets(Consumer<String> msgPrintln, Consumer<String> warnPrintln, Consumer<String> channelNameConsumer, Config config) {
-        msgPrintln.accept("Used " + config.getBackgroundPacketSystem().name() + " as background packet system");
+    public static void initPackets(Consumer<String> msgPrintln, Consumer<String> warnPrintln, Consumer<String> channelNameConsumer) {
         Init instance = new Init(msgPrintln, warnPrintln, channelNameConsumer);
         instance.registerAllSerializers();
         instance.registerAllPackets();

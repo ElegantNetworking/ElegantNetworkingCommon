@@ -1,0 +1,13 @@
+apply plugin: 'java'
+
+group 'io.gitlab.hohserg.elegant.networking'
+version '1.0'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+}
